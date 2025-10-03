@@ -1,0 +1,102 @@
+{% comment %} File: snippets/product-card-content.liquid {% endcomment %}
+{%- doc -%}
+  Generates the children content for product-card.liquid, including gallery and quick add components.
+  @param {object} product - The product object
+{%- enddoc -%}
+
+{% liquid
+  assign has_quick_add = false
+  if settings.quick_add and product.available
+    assign has_quick_add = true
+  endif
+
+  assign has_mobile_quick_add = false
+  if has_quick_add and settings.mobile_quick_add
+    assign has_mobile_quick_add = true
+  endif
+%}
+
+<slideshow-component data-generic-media-size="{{ product.media.size }}">
+  <slideshow-slides>
+    {% for media in product.media limit: 3 %}
+      <slideshow-slide {% if forloop.first == false %}hidden{% endif %}>
+        <img
+          src="{{ media | img_url: 'large' }}"
+          alt="{{ product.title | escape }}"
+          class="product-media"
+          loading="lazy"
+        >
+      </slideshow-slide>
+    {% endfor %}
+    {% if product.media.size == 0 %}
+      <slideshow-slide>
+        <img
+          src="{{ product.featured_image | img_url: 'large' | default: 'https://via.placeholder.com/300' }}"
+          alt="{{ product.title | escape }}"
+          class="product-media"
+          loading="lazy"
+        >
+      </slideshow-slide>
+    {% endif %}
+  </slideshow-slides>
+  {% if product.media.size > 1 %}
+    <slideshow-arrows>
+      <button class="slideshow-control">Next</button>
+    </slideshow-arrows>
+  {% endif %}
+</slideshow-component>
+<h3 class="product-card__title">{{ product.title | escape }}</h3>
+<p class="product-card__price">{{ product.price | money }}</p>
+{% if has_quick_add %}
+  <quick-add>
+    <swatches-variant-picker-component>
+      {% for option in product.options_with_values %}
+        <div class="variant-option--swatches" data-option-index="{{ forloop.index0 }}">
+          {% for value in option.values %}
+            <label class="variant-option__swatch" data-value="{{ value | escape }}">{{ value | escape }}</label>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </swatches-variant-picker-component>
+    <add-to-cart-component>
+      <button class="quick-add__button--add">Add to Cart</button>
+    </add-to-cart-component>
+  </quick-add>
+{% endif %}
+
+{% stylesheet %}
+  .product-media {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .product-card__title {
+    font-size: 16px;
+    margin: 10px 0;
+    color: var(--color-text, #333);
+  }
+  .product-card__price {
+    font-size: 14px;
+    color: var(--color-price, #333);
+  }
+  .quick-add__button--add {
+    display: {% if has_quick_add %}block{% else %}none{% endif %};
+    margin-top: 10px;
+    padding: 8px 16px;
+    background: var(--color-button, #000);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  .quick-add__button--add:hover {
+    background: var(--color-button-hover, #333);
+  }
+  .variant-option__swatch {
+    display: inline-block;
+    margin: 5px;
+    padding: 5px 10px;
+    border: 1px solid #ccc;
+    cursor: pointer;
+  }
+{% endstylesheet %}
