@@ -1,0 +1,124 @@
+{% comment %}
+Multi Collection Featured Products (Lazy Load, safe version)
+{% endcomment %}
+
+<div class="multi-coll-featured">
+  {% assign handles_string = section.settings.collections | join: ',' %}
+  {% assign featured_handles = handles_string | split: ',' | uniq %}
+
+  {% assign used_ids = "" %}
+  {% assign shown = 0 %}
+
+  <div id="product-list-{{ section.id }}" class="grid grid-cols-{{ section.settings.columns }} gap-4">
+    {% for handle in featured_handles %}
+      {% assign coll = collections[handle] %}
+      {% if coll %}
+        {% assign coll_count = coll.products_count | plus: 0 %}
+        {% if coll_count > 0 %}
+          {% for prod in coll.products limit: section.settings.limit %}
+            {% unless used_ids contains prod.id %}
+              {% capture used_ids %}{{ used_ids }},{{ prod.id }}{% endcapture %}
+{% render 'product-card', children: prod, product: closest.product, product_card_gap: 8 %}
+              {% assign shown = shown | plus: 1 %}
+              {% if shown >= section.settings.initial_load %}
+                {% break %}
+              {% endif %}
+            {% endunless %}
+          {% endfor %}
+        {% endif %}
+      {% endif %}
+      {% if shown >= section.settings.initial_load %}
+        {% break %}
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  {% if shown >= section.settings.initial_load %}
+    <div class="load-more-wrapper" style="text-align:center; margin-top:20px;">
+      <button 
+        class="load-more-btn"
+        data-section="{{ section.id }}"
+        data-initial="{{ section.settings.initial_load }}"
+        data-limit="{{ section.settings.limit }}">
+        Load more
+      </button>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+document.addEventListener("click", function(e) {
+  if (e.target.classList.contains("load-more-btn")) {
+    let btn = e.target;
+    let sectionId = btn.getAttribute("data-section");
+    let container = document.querySelector("#product-list-" + sectionId);
+    let alreadyLoaded = container.querySelectorAll(".product-card").length;
+    let limit = parseInt(btn.getAttribute("data-limit"));
+
+    fetch(window.location.pathname + "?section_id=" + sectionId)
+      .then(res => res.text())
+      .then(html => {
+        let parser = new DOMParser();
+        let doc = parser.parseFromString(html, "text/html");
+        let newItems = doc.querySelectorAll("#product-list-" + sectionId + " .product-card");
+
+        for (let i = alreadyLoaded; i < alreadyLoaded + limit; i++) {
+          if (newItems[i]) {
+            container.appendChild(newItems[i]);
+          }
+        }
+
+        if (alreadyLoaded + limit >= newItems.length) {
+          btn.remove();
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        btn.textContent = "Error, try again";
+      });
+  }
+});
+</script>
+
+{% schema %}
+{
+  "name": "Multi Coll Feat",
+  "settings": [
+    {
+      "type": "collection_list",
+      "id": "collections",
+      "label": "Select collections",
+      "limit": 10
+    },
+    {
+      "type": "range",
+      "id": "columns",
+      "label": "Grid columns",
+      "min": 2,
+      "max": 5,
+      "step": 1,
+      "default": 4
+    },
+    {
+      "type": "range",
+      "id": "limit",
+      "label": "Max products per collection",
+      "min": 2,
+      "max": 20,
+      "step": 1,
+      "default": 5
+    },
+    {
+      "type": "number",
+      "id": "initial_load",
+      "label": "Products to load initially",
+      "default": 8
+    }
+  ],
+  "presets": [
+    {
+      "name": "Multi Coll Feat"
+    }
+  ]
+}
+{% endschema %}

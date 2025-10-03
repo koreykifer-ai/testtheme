@@ -1,0 +1,289 @@
+{% comment %} File: sections/multi-collections-featured-2.liquid {% endcomment %}
+<div class="section-background color-{{ section.settings.color_scheme | default: 'scheme-1' }}"></div>
+<results-list
+  class="section product-grid-container color-{{ section.settings.color_scheme | default: 'scheme-1' }}"
+  style="--padding-block-start: {{ section.settings.padding_block_start | default: 8 }}px; --padding-block-end: {{ section.settings.padding_block_end | default: 8 }}px;"
+  section-id="{{ section.id }}"
+  data-section-id="{{ section.id }}"
+>
+  {% render 'skip-to-content-link', href: '#ResultsList', text: 'accessibility.skip_to_results_list' %}
+
+  <div class="collection-wrapper grid gap-style">
+    {% if section.blocks.size == 0 %}
+      <p>No collections selected. Please add a collection in the Theme Editor.</p>
+    {% else %}
+      {% assign page_param = request.page_params.page | default: 1 %}
+      {% assign products_limit = section.settings.products_limit | default: 24 %}
+      {% for block in section.blocks %}
+        {% assign selected_collection = block.settings.collection %}
+        {% if selected_collection != blank and selected_collection.products != blank and selected_collection.products.size > 0 %}
+          {% if block.settings.title != blank %}
+            <h2>{{ block.settings.title | escape }}</h2>
+          {% endif %}
+          {% assign products = selected_collection.products %}
+          {% assign offset = page_param | minus: 1 | times: products_limit %}
+          {% capture children %}
+            {% for product in products offset: offset limit: products_limit %}
+              <li
+                id="{{ section.id }}-{{ block.id }}-{{ product.id }}"
+                class="product-grid__item product-grid__item--{{ forloop.index0 }}"
+                data-page="{{ page_param }}"
+                data-product-id="{{ product.id }}"
+              >
+                {% render 'product-card', product: product %}
+              </li>
+            {% endfor %}
+          {% endcapture %}
+          {% assign total_pages = products.size | divided_by: products_limit | plus: 1 %}
+          {% render 'product-grid',
+            section: section,
+            children: children,
+            title: block.settings.title,
+            total_pages: total_pages,
+            current_page: page_param
+          %}
+        {% else %}
+          <p>Invalid or empty collection for "{{ block.settings.title | default: 'Unknown' }}". Please select a valid collection with products in the Theme Editor.</p>
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+  </div>
+</results-list>
+
+{% stylesheet %}
+  :root {
+    --page-width: 1200px;
+    --page-margin: 20px;
+  }
+  .product-grid-container {
+    display: block !important;
+    width: 100%;
+    max-width: var(--page-width);
+    margin: 0 auto;
+  }
+  .collection-wrapper {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    @media screen and (min-width: 750px) {
+      grid-template-columns: repeat({{ section.settings.columns_desktop | default: 3 }}, minmax(0, 1fr));
+    }
+  }
+  .collection-wrapper h2 {
+    margin-top: 20px;
+    font-size: 24px;
+    text-align: center;
+  }
+  .product-grid__item {
+    display: block !important;
+    padding: 10px;
+    min-height: 100px;
+  }
+  .pagination {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .pagination a, .pagination span {
+    padding: 8px 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    text-decoration: none;
+    color: #333;
+  }
+  .pagination a:hover {
+    background-color: #f5f5f5;
+  }
+  .pagination span {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+  }
+{% endstylesheet %}
+
+{% javascript %}
+  document.querySelectorAll('.pagination a').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const page = new URL(e.target.href).searchParams.get('page');
+      const sectionId = '{{ section.id }}';
+      const url = `/?sections=${sectionId}&page=${page}`;
+      
+      const request = new XMLHttpRequest();
+      request.addEventListener('load', function () {
+        const response = JSON.parse(this.responseText);
+        if (response[sectionId]) {
+          const sectionContent = document.querySelector(`[data-section-id="${sectionId}"]`);
+          sectionContent.innerHTML = response[sectionId];
+          // Re-attach event listeners for gallery
+          attachGalleryEvents();
+        } else {
+          console.error('Section failed to render:', sectionId);
+        }
+      });
+      request.open('GET', url, true);
+      request.send();
+    });
+  });
+
+  function attachGalleryEvents() {
+    document.querySelectorAll('.product-card').forEach(card => {
+      const images = card.querySelectorAll('.card-gallery__image');
+      if (images.length > 1) {
+        let currentIndex = 0;
+        card.addEventListener('mouseenter', () => {
+          images.forEach(img => img.classList.remove('card-gallery__image--active'));
+          currentIndex = (currentIndex + 1) % images.length;
+          images[currentIndex].classList.add('card-gallery__image--active');
+        });
+        card.addEventListener('mouseleave', () => {
+          images.forEach(img => img.classList.remove('card-gallery__image--active'));
+          images[0].classList.add('card-gallery__image--active');
+          currentIndex = 0;
+        });
+      }
+    });
+  }
+
+  // Initialize gallery events on page load
+  document.addEventListener('DOMContentLoaded', attachGalleryEvents);
+{% endjavascript %}
+
+{% schema %}
+{
+  "name": "Multi Collects Container",
+  "enabled_on": {
+    "templates": ["*"]
+  },
+  "settings": [
+    {
+      "type": "select",
+      "id": "layout_type",
+      "label": "Layout type",
+      "options": [
+        { "value": "grid", "label": "Grid" },
+        { "value": "organic", "label": "Editorial" }
+      ],
+      "default": "grid"
+    },
+    {
+      "type": "select",
+      "id": "product_card_size",
+      "label": "Card size",
+      "options": [
+        { "value": "small", "label": "Small" },
+        { "value": "medium", "label": "Medium" },
+        { "value": "large", "label": "Large" },
+        { "value": "extra-large", "label": "Extra large" }
+      ],
+      "default": "medium"
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "Color scheme",
+      "default": "scheme-1"
+    },
+    {
+      "type": "range",
+      "id": "padding_block_start",
+      "label": "Top padding",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "padding_block_end",
+      "label": "Bottom padding",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "columns_desktop",
+      "label": "Number of columns on desktop",
+      "min": 2,
+      "max": 5,
+      "step": 1,
+      "default": 3
+    },
+    {
+      "type": "range",
+      "id": "columns_gap_horizontal",
+      "label": "Horizontal gap between columns",
+      "min": 0,
+      "max": 50,
+      "step": 1,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "range",
+      "id": "columns_gap_vertical",
+      "label": "Vertical gap between columns",
+      "min": 0,
+      "max": 50,
+      "step": 1,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "select",
+      "id": "product_grid_width",
+      "label": "Grid width",
+      "options": [
+        { "value": "centered", "label": "Centered" },
+        { "value": "full-width", "label": "Full width" }
+      ],
+      "default": "centered"
+    },
+    {
+      "type": "checkbox",
+      "id": "full_width_on_mobile",
+      "label": "Full width on mobile",
+      "default": false
+    },
+    {
+      "type": "range",
+      "id": "products_limit",
+      "label": "Products per page",
+      "min": 4,
+      "max": 48,
+      "step": 4,
+      "default": 24
+    }
+  ],
+  "blocks": [
+    {
+      "type": "collection",
+      "name": "Collection",
+      "settings": [
+        {
+          "type": "collection",
+          "id": "collection",
+          "label": "Select collection"
+        },
+        {
+          "type": "text",
+          "id": "title",
+          "label": "Collection title (optional)",
+          "default": "Featured Collection"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Multi Collections Container",
+      "blocks": []
+    }
+  ]
+}
+{% endschema %}

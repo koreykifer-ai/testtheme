@@ -1,0 +1,474 @@
+{% comment %} File: sections/multi-collections-featured-3.liquid {% endcomment %}
+{% comment %} Multi-Collection Featured Products - Lazy Load with Tinker Theme Styles {% endcomment %}
+
+{% capture handles_string %}{% endcapture %}
+{% if section.blocks.size == 0 and request.design_mode %}
+  <p>Debug: No collection blocks added. Please add at least one collection block in the Theme Editor.</p>
+{% endif %}
+{% for block in section.blocks %}
+  {% assign collection_handle = block.settings.collection | default: 'Not selected' %}
+  {% assign collection = collections[collection_handle] %}
+  {% if request.design_mode %}
+    <p>Debug: Processing block ID: {{ block.id }}</p>
+    <p>Debug: Block collection handle: {{ collection_handle }}</p>
+    {% if collection != blank %}
+      <p>Debug: Collection object exists: true</p>
+      <p>Debug: Collection title: {{ collection.title | default: 'None' }}</p>
+      <p>Debug: Collection products count: {{ collection.products.size | default: 0 }}</p>
+    {% else %}
+      <p>Debug: Collection object exists: false</p>
+    {% endif %}
+  {% endif %}
+  {% if collection != blank %}
+    {% if collection.products.size > 0 %}
+      {% for product in collection.products %}
+        {% if product.available %}
+          {% assign prod = all_products[product.handle] %}
+          {% if prod != blank and prod.available %}
+            {% capture handles_string %}{{ handles_string }}|{{ product.handle }}{% endcapture %}
+            {% if request.design_mode %}
+              <p>Debug: Added product handle: {{ product.handle }} (Title: {{ product.title }}) from collection "{{ collection_handle }}"</p>
+            {% endif %}
+          {% elsif request.design_mode %}
+            {% if prod != blank %}
+              <p>Debug: Skipped product handle: {{ product.handle }} (Title: {{ product.title }}) - Product exists: true - Product available: {{ prod.available | default: false }}</p>
+            {% else %}
+              <p>Debug: Skipped product handle: {{ product.handle }} (Title: {{ product.title }}) - Product exists: false - Product available: false</p>
+            {% endif %}
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+    {% elsif request.design_mode %}
+      <p>Debug: Collection "{{ collection_handle }}" (Block ID: {{ block.id }}) has no products.</p>
+    {% endif %}
+  {% elsif request.design_mode %}
+    <p>Debug: Collection "{{ collection_handle }}" (Block ID: {{ block.id }}) is invalid or not found.</p>
+  {% endif %}
+{% endfor %}
+{% assign handles_string = handles_string | remove_first: '|' | strip %}
+{% assign split_array = handles_string | split: '|' %}
+{% assign featured_handles = split_array | uniq %}
+
+{% if request.design_mode %}
+  <p>Debug: Number of blocks: {{ section.blocks.size }}</p>
+  <p>Debug: Raw handles string length: {{ handles_string | size }}</p>
+  <p>Debug: Raw handles string first 100 chars: {{ handles_string | slice: 0, 100 | default: 'None' }}</p>
+  <p>Debug: Split array size: {{ split_array.size }}</p>
+  <p>Debug: Featured handles count: {{ featured_handles.size }}</p>
+  {% for handle in split_array %}
+    {% assign prod = all_products[handle] %}
+    {% if prod != blank %}
+      <p>Debug: Handle "{{ handle }}" - Product exists: true - Product available: {{ prod.available | default: false }} - Product title: {{ prod.title | default: 'None' }}</p>
+    {% else %}
+      <p>Debug: Handle "{{ handle }}" - Product exists: false - Product available: false</p>
+    {% endif %}
+  {% endfor %}
+  <p>Debug: Max products setting: {{ section.settings.max_products }}</p>
+  {% assign initial_handles = featured_handles | slice: 0, section.settings.max_products %}
+  <p>Debug: Initial handles: {{ initial_handles | join: ', ' | default: 'None' }}</p>
+  <p>Debug: Initial handles count: {{ initial_handles.size }}</p>
+  <p>Debug: Theme settings - quick_add: {{ settings.quick_add | default: 'Not defined' }}</p>
+  <p>Debug: Theme settings - mobile_quick_add: {{ settings.mobile_quick_add | default: 'Not defined' }}</p>
+{% endif %}
+
+{%- liquid
+  assign quick_add_enabled = settings.quick_add | default: false
+  assign mobile_quick_add_enabled = settings.mobile_quick_add | default: false
+-%}
+
+<div
+  id="multi-collection-container"
+  class="section product-grid-container color-{{ section.settings.color_scheme | default: 'scheme-1' }}"
+  style="--padding-block-start: {{ section.settings.padding_block_start | default: 8 }}px; --padding-block-end: {{ section.settings.padding_block_end | default: 8 }}px;"
+  section-id="{{ section.id }}"
+  data-limit="{{ section.settings.max_products }}"
+  data-all="{{ featured_handles | join: ',' }}"
+  data-quick-add="{{ quick_add_enabled | json }}"
+  data-mobile-quick-add="{{ mobile_quick_add_enabled | json }}"
+>
+  {% render 'skip-to-content-link', href: '#ResultsList', text: 'accessibility.skip_to_results_list' %}
+
+  {% if featured_handles.size > 0 %}
+    {% capture children %}
+      {% assign initial_handles = featured_handles | slice: 0, section.settings.max_products %}
+      {% for handle in initial_handles %}
+        {% assign prod = all_products[handle] %}
+        {% if prod != blank and prod.available %}
+          {% capture product_children %}
+            {% render 'product-card-content', product: prod %}
+          {% endcapture %}
+          {% if request.design_mode %}
+            <p>Debug: Rendering product handle: {{ handle }} (Title: {{ prod.title }}) - Product exists: true - Product available: {{ prod.available }}</p>
+            <p>Debug: Product ID: {{ prod.id | default: 'None' }} - Media count: {{ prod.media.size | default: 0 }} - Featured media: {{ prod.featured_media | default: 'None' }}</p>
+            <p>Debug: Product children length: {{ product_children | size }}</p>
+            <p>Debug: Product children first 100 chars: {{ product_children | truncate: 100 | default: 'None' }}</p>
+          {% endif %}
+          <li
+            class="product-grid__item"
+            data-product-id="{{ prod.id }}"
+          >
+            {% render 'product-card', product: prod, children: product_children %}
+            {% if request.design_mode %}
+              <p>Debug: Rendered product-card for handle: {{ handle }} (Title: {{ prod.title }})</p>
+            {% endif %}
+          </li>
+        {% elsif request.design_mode %}
+          {% if prod != blank %}
+            <p>Debug: Skipping render for handle: {{ handle }} - Product exists: true - Product available: {{ prod.available | default: false }}</p>
+          {% else %}
+            <p>Debug: Skipping render for handle: {{ handle }} - Product exists: false - Product available: false</p>
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+      {% if request.design_mode %}
+        <p>Debug: Completed rendering loop for {{ initial_handles.size }} handles</p>
+      {% endif %}
+    {% endcapture %}
+    {% if request.design_mode %}
+      {% if children %}
+        <p>Debug: Children content captured: true</p>
+        <p>Debug: Children content length: {{ children | size }}</p>
+        <p>Debug: Children content first 100 chars: {{ children | truncate: 100 | default: 'None' }}</p>
+      {% else %}
+        <p>Debug: Children content captured: false</p>
+      {% endif %}
+    {% endif %}
+    {% render 'product-grid-custom',
+      section: section,
+      children: children,
+      products: featured_handles,
+      title: section.settings.title
+    %}
+    <div id="loadMoreSentinel" style="height:40px;"></div>
+  {% else %}
+    <p>No featured products found. Please select valid collections with available products in the Theme Editor.</p>
+  {% endif %}
+</div>
+
+{% stylesheet %}
+  :root {
+    --page-width: 1200px;
+    --page-margin: 20px;
+  }
+  .product-grid-container {
+    display: block !important;
+    width: 100%;
+    max-width: var(--page-width);
+    margin: 0 auto;
+  }
+{% endstylesheet %}
+
+{% javascript %}
+  document.addEventListener('DOMContentLoaded', function () {
+    const container = document.querySelector('.product-grid--{{ section.id }}');
+    if (!container) {
+      console.warn('Product grid container not found for section {{ section.id }}');
+      return;
+    }
+
+    const allHandles = document.getElementById('multi-collection-container').dataset.all.split(',').filter(handle => handle);
+    const limit = parseInt(document.getElementById('multi-collection-container').dataset.limit);
+    const quickAddEnabled = JSON.parse(document.getElementById('multi-collection-container').dataset.quickAdd || 'false');
+    const mobileQuickAddEnabled = JSON.parse(document.getElementById('multi-collection-container').dataset.mobileQuickAdd || 'false');
+    let current = limit;
+
+    function loadNextBatch() {
+      const nextHandles = allHandles.slice(current, current + limit);
+      nextHandles.forEach((handle) => {
+        if (!handle) return;
+        fetch(`/products/${handle}.js`)
+          .then((res) => {
+            if (!res.ok) throw new Error(`HTTP error ${res.status} for product ${handle}`);
+            return res.json();
+          })
+          .then((prod) => {
+            if (prod.available) {
+              const variantToLink = prod.variants.find(v => v.featured_media?.id === prod.featured_media?.id) || prod.variants[0];
+              const featuredImage = variantToLink.featured_image || prod.featured_media;
+              const featuredMediaUrl = featuredImage ? `${featuredImage.src}?w=500` : 'https://via.placeholder.com/300';
+              const hasQuickAdd = quickAddEnabled && prod.available;
+              const hasMobileQuickAdd = hasQuickAdd && mobileQuickAddEnabled;
+              let html = `
+                <li class="product-grid__item" data-product-id="${prod.id}">
+                  <product-card-link
+                    data-product-id="${prod.id}"
+                    data-featured-media-url="${featuredMediaUrl}"
+                    data-product-transition="{{ settings.transition_to_main_product | json }}"
+                  >
+                    <product-card
+                      class="product-card"
+                      data-product-id="${prod.id}"
+                      data-product-variants-size="${prod.variants.length}"
+                      id="product-card-${prod.id}"
+                      data-product-transition="{{ settings.transition_to_main_product | json }}"
+                    >
+                      <a
+                        href="/products/${prod.handle}"
+                        class="product-card__link"
+                        ref="productCardLink"
+                      >
+                        <span class="visually-hidden">${prod.title}</span>
+                      </a>
+                      <div
+                        class="
+                          product-card__content
+                          layout-panel-flex
+                          layout-panel-flex--column
+                          product-grid__card
+                          spacing-style
+                          border-style
+                          gap-style
+                          color-{{ section.settings.color_scheme | default: 'scheme-1' }}"
+                        style="
+                          --quick-add-display: ${hasQuickAdd ? 'flex' : 'none'};
+                          --quick-add-mobile-display: ${hasMobileQuickAdd ? 'flex' : 'none'};
+                        "
+                      >
+                        <slideshow-component data-generic-media-size="${prod.images.length}">
+                          <slideshow-slides>
+                            ${
+                              prod.images.length > 0
+                                ? prod.images
+                                    .slice(0, 3)
+                                    .map(
+                                      (img, index) =>
+                                        `<slideshow-slide ${
+                                          index === 0 ? '' : 'hidden'
+                                        }><img src="${img}" alt="${prod.title}" class="product-media" loading="lazy"></slideshow-slide>`
+                                    )
+                                    .join('')
+                                : `<slideshow-slide><img src="${featuredMediaUrl}" alt="${prod.title}" class="product-media" loading="lazy"></slideshow-slide>`
+                            }
+                          </slideshow-slides>
+                          ${prod.images.length > 1 ? '<slideshow-arrows><button class="slideshow-control">Next</button></slideshow-arrows>' : ''}
+                        </slideshow-component>
+                        <h3 class="product-card__title">${prod.title}</h3>
+                        <p class="product-card__price">${(prod.price / 100).toLocaleString('en-US', {
+                          style: 'currency',
+                          currency: 'USD',
+                        })}</p>
+                        ${
+                          hasQuickAdd
+                            ? `<quick-add>
+                                <swatches-variant-picker-component>
+                                  ${prod.options
+                                    .map(
+                                      (option, optIndex) =>
+                                        `<div class="variant-option--swatches" data-option-index="${optIndex}">
+                                          ${option.values
+                                            .map(
+                                              (value, valIndex) =>
+                                                `<label class="variant-option__swatch" data-value="${value}">${value}</label>`
+                                            )
+                                            .join('')}
+                                        </div>`
+                                    )
+                                    .join('')}
+                                </swatches-variant-picker-component>
+                                <add-to-cart-component>
+                                  <button class="quick-add__button--add">Add to Cart</button>
+                                </add-to-cart-component>
+                              </quick-add>`
+                            : ''
+                        }
+                      </div>
+                    </product-card>
+                  </product-card-link>
+                </li>`;
+              container.insertAdjacentHTML('beforeend', html);
+              attachGalleryEvents(container.querySelector(`[data-product-id="${prod.id}"]`));
+            }
+          })
+          .catch((error) => console.error(`Error fetching product ${handle}:`, error));
+      });
+
+      current += limit;
+      if (current >= allHandles.length) {
+        observer.disconnect();
+        sentinel.remove();
+      }
+    }
+
+    function attachGalleryEvents(card) {
+      const slideshow = card.querySelector('slideshow-component');
+      if (slideshow && slideshow.querySelectorAll('slideshow-slide').length > 1) {
+        const slides = slideshow.querySelectorAll('slideshow-slide');
+        const controls = slideshow.querySelector('slideshow-arrows')?.querySelectorAll('.slideshow-control');
+        let currentIndex = 0;
+
+        if (controls) {
+          controls.forEach((control, index) => {
+            control.addEventListener('click', () => {
+              slides.forEach(slide => slide.setAttribute('hidden', ''));
+              currentIndex = index === 0 ? (currentIndex + 1) % slides.length : (currentIndex - 1 + slides.length) % slides.length;
+              slides[currentIndex].removeAttribute('hidden');
+            });
+          });
+        }
+
+        card.addEventListener('mouseenter', () => {
+          slides.forEach(slide => slide.setAttribute('hidden', ''));
+          currentIndex = (currentIndex + 1) % slides.length;
+          slides[currentIndex].removeAttribute('hidden');
+        });
+        card.addEventListener('mouseleave', () => {
+          slides.forEach(slide => slide.setAttribute('hidden', ''));
+          slides[0].removeAttribute('hidden');
+          currentIndex = 0;
+        });
+      }
+    }
+
+    const sentinel = document.getElementById('loadMoreSentinel');
+    if (sentinel) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting) {
+            loadNextBatch();
+          }
+        },
+        { rootMargin: '200px' }
+      );
+      observer.observe(sentinel);
+    } else {
+      console.warn('Load more sentinel not found');
+    }
+
+    document.querySelectorAll('.product-card').forEach(attachGalleryEvents);
+  });
+{% endjavascript %}
+
+{% schema %}
+{
+  "name": "Multi-Collection 3",
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Section title",
+      "default": "Featured Collections"
+    },
+    {
+      "type": "range",
+      "id": "max_products",
+      "min": 4,
+      "max": 24,
+      "step": 4,
+      "label": "Products per batch",
+      "default": 12
+    },
+    {
+      "type": "range",
+      "id": "columns_desktop",
+      "min": 2,
+      "max": 5,
+      "step": 1,
+      "label": "Grid columns on desktop",
+      "default": 4
+    },
+    {
+      "type": "select",
+      "id": "layout_type",
+      "label": "Layout type",
+      "options": [
+        { "value": "grid", "label": "Grid" },
+        { "value": "organic", "label": "Editorial" }
+      ],
+      "default": "grid"
+    },
+    {
+      "type": "select",
+      "id": "product_card_size",
+      "label": "Card size",
+      "options": [
+        { "value": "small", "label": "Small" },
+        { "value": "medium", "label": "Medium" },
+        { "value": "large", "label": "Large" },
+        { "value": "extra-large", "label": "Extra large" }
+      ],
+      "default": "medium"
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "Color scheme",
+      "default": "scheme-1"
+    },
+    {
+      "type": "range",
+      "id": "padding_block_start",
+      "label": "Top padding",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "padding_block_end",
+      "label": "Bottom padding",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "columns_gap_horizontal",
+      "label": "Horizontal gap between columns",
+      "min": 0,
+      "max": 50,
+      "step": 1,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "range",
+      "id": "columns_gap_vertical",
+      "label": "Vertical gap between columns",
+      "min": 0,
+      "max": 50,
+      "step": 1,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "select",
+      "id": "product_grid_width",
+      "label": "Grid width",
+      "options": [
+        { "value": "centered", "label": "Centered" },
+        { "value": "full-width", "label": "Full width" }
+      ],
+      "default": "centered"
+    },
+    {
+      "type": "checkbox",
+      "id": "full_width_on_mobile",
+      "label": "Full width on mobile",
+      "default": false
+    }
+  ],
+  "blocks": [
+    {
+      "type": "collection_block",
+      "name": "Collection",
+      "settings": [
+        {
+          "type": "collection",
+          "id": "collection",
+          "label": "Select collection"
+        }
+      ]
+    }
+  ],
+  "max_blocks": 5,
+  "presets": [
+    {
+      "name": "Multi-Collection Featured Lazy"
+    }
+  ]
+}
+{% endschema %}
